@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: gists-proxy
+    restart: unless-stopped
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - '8005:3000'
+    depends_on:
+      - 'db'
+  db:
+    image: redis:alpine 
+    container_name: gists-redis 
+    restart: unless-stopped
+    volumes:
+      - ./cache:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
