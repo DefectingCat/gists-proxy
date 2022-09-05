@@ -3,6 +3,7 @@ import $ax from '../utils/axios';
 import redis from '../utils/redis';
 
 const router = Router();
+const expireTime = 60 * 60 * 24; // one day.
 const getData = async (req: Request) => {
     const { query, method } = req;
     const { host, ...headers } = req.headers;
@@ -28,9 +29,13 @@ const getData = async (req: Request) => {
             params: query,
             method,
         });
-        await redis.setex(key, 600, JSON.stringify(result.data));
-        await redis.setex(statusKey, 600, result.status);
-        await redis.setex(headerKey, 600, JSON.stringify(result.headers));
+        await redis.setex(key, expireTime, JSON.stringify(result.data));
+        await redis.setex(statusKey, expireTime, result.status);
+        await redis.setex(
+            headerKey,
+            expireTime,
+            JSON.stringify(result.headers)
+        );
         return {
             headers: JSON.stringify(result.headers),
             status: result.status,
