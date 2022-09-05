@@ -3,7 +3,11 @@ import $ax from '../utils/axios';
 import redis from '../utils/redis';
 
 const router = Router();
-const expireTime = 60 * 60 * 24; // one day.
+// const expireTime = 60 * 60 * 24; // one day.
+const expireTime = isNaN(Number(process.env.EXPIRE_TIME))
+    ? 60 * 60 * 24
+    : Number(process.env.EXPIRE_TIME);
+
 const getData = async (req: Request) => {
     const { query, method } = req;
     const { host, ...headers } = req.headers;
