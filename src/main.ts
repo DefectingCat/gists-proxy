@@ -1,8 +1,8 @@
 import express from 'express';
+import expressWinston from 'express-winston';
 import helmet from 'helmet';
 import winston from 'winston';
-import expressWinston from 'express-winston';
-import helloRouter from './routes/hello';
+import gistsRouter from './routes/gists';
 
 const app = express();
 const port = 3000;
@@ -23,10 +23,7 @@ app.use(
     })
 );
 
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
-app.use(helloRouter);
+app.use(gistsRouter);
 
 app.use(
     expressWinston.errorLogger({
