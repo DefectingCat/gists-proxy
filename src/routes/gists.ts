@@ -21,7 +21,6 @@ const getData = async (req: Request) => {
     const result = await $ax(req.path, {
         headers: headers as {},
         params: query,
-
         method,
     });
     await redis.setex(key, 600, JSON.stringify(result.data));
