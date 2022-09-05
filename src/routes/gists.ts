@@ -8,40 +8,63 @@ const getData = async (req: Request) => {
     const { host, ...headers } = req.headers;
     const key = `${req.path}${JSON.stringify(query)}`;
     const headerKey = `${key}-headers`;
+    const statusKey = `${key}-status`;
+
     const cache = await redis.get(key);
     if (cache) {
         const headers = await redis.get(headerKey);
-        if (!headers) throw new Error('no headrs');
+        const status = Number(await redis.get(statusKey));
+        if (!headers || !status) throw new Error('no headrs');
         return {
             headers,
+            status,
             data: cache,
         };
     }
 
-    const result = await $ax(req.path, {
-        headers: headers as {},
-        params: query,
-        method,
-    });
-    await redis.setex(key, 600, JSON.stringify(result.data));
-    await redis.setex(headerKey, 600, JSON.stringify(result.headers));
-    return {
-        headers: JSON.stringify(result.headers),
-        data: result.data,
-    };
+    try {
+        const result = await $ax(req.path, {
+            headers: headers as {},
+            params: query,
+            method,
+        });
+        await redis.setex(key, 600, JSON.stringify(result.data));
+        await redis.setex(statusKey, 600, result.status);
+        await redis.setex(headerKey, 600, JSON.stringify(result.headers));
+        return {
+            headers: JSON.stringify(result.headers),
+            status: result.status,
+            data: result.data,
+        };
+    } catch (err) {
+        if ('response' in (err as {})) {
+            const { response } = err as any;
+            console.log(response);
+            return {
+                headers: JSON.stringify(response.headers),
+                status: response.status,
+                data: response.data,
+            };
+        } else {
+            return {
+                headers: '{}',
+                status: 404,
+                data: {},
+            };
+        }
+    }
 };
 
 router.all('/*', async (req, res) => {
-    try {
-        const result = await getData(req);
-        res.header(JSON.parse(result.headers));
-        res.setHeader('content-length', result.data.length);
-        res.setHeader('transfer-encoding', '');
-        res.send(result.data);
-    } catch (err) {
-        console.error(err);
-        res.status(404).send(JSON.stringify(err));
-    }
+    const result = await getData(req);
+    res.header(JSON.parse(result.headers));
+    res.status(result.status);
+    res.setHeader(
+        'content-length',
+        result.data.length ?? result.data.toString().length
+    );
+    res.setHeader('transfer-encoding', '');
+    res.send(result.data);
 });
 
 export default router;
