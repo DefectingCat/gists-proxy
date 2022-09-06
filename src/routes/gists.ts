@@ -8,24 +8,14 @@ const expireTime = isNaN(Number(process.env.EXPIRE_TIME))
     ? 60 * 60 * 24
     : Number(process.env.EXPIRE_TIME);
 
-const getData = async (req: Request) => {
+const fetchNew = async (
+    req: Request,
+    key: string,
+    statusKey: string,
+    headerKey: string
+) => {
     const { query, method } = req;
     const { host, ...headers } = req.headers;
-    const key = `${req.path}${JSON.stringify(query)}`;
-    const headerKey = `${key}-headers`;
-    const statusKey = `${key}-status`;
-
-    const cache = await redis.get(key);
-    if (cache) {
-        const headers = await redis.get(headerKey);
-        const status = Number(await redis.get(statusKey));
-        if (!headers || !status) throw new Error('no headrs');
-        return {
-            headers,
-            status,
-            data: cache,
-        };
-    }
 
     try {
         const result = await $ax(req.path, {
@@ -63,6 +53,43 @@ const getData = async (req: Request) => {
         }
     }
 };
+
+const getData = async (req: Request) => {
+    const { query } = req;
+    const { host, ...headers } = req.headers;
+    const token = headers.authorization;
+
+    const key = `${req.path}${JSON.stringify(query)}`;
+    const headerKey = `${key}-headers`;
+    const statusKey = `${key}-status`;
+
+    const cache = await redis.get(key);
+    if (cache) {
+        const headers = await redis.get(headerKey);
+        const status = Number(await redis.get(statusKey));
+        if (!headers || !status) throw new Error('no headrs');
+        return {
+            headers,
+            status,
+            data: cache,
+        };
+    }
+
+    return token
+        ? await fetchNew(req, key, statusKey, headerKey)
+        : {
+              headers: '{}',
+              status: 403,
+              data: {
+                  message: 'Has no token and no cache.',
+              },
+          };
+};
+
+router.post('/clean', async (req, res) => {
+    const result = await redis.flushall();
+    res.send(result);
+});
 
 router.all('/*', async (req, res) => {
     const result = await getData(req);
