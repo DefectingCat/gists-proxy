@@ -1,6 +1,7 @@
 import express from 'express';
 import expressWinston from 'express-winston';
 import helmet from 'helmet';
+import { updateCache } from './utils/jobs';
 import winston from 'winston';
 import gistsRouter from './routes/gists';
 
@@ -38,6 +39,9 @@ app.use(
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
+
+// Auto update.
+updateCache();
 
 // Export default
 export default app;
