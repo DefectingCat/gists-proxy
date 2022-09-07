@@ -1,58 +1,15 @@
 import { Router, Request } from 'express';
-import $ax from '../utils/axios';
+import { sleep } from '../utils/sleep';
+import {
+    fetchNew,
+    cacheNew,
+    saveRequest,
+    CustomReq,
+    requestKey,
+} from '../utils/fetcher';
 import redis from '../utils/redis';
 
 const router = Router();
-// const expireTime = 60 * 60 * 24; // one day.
-const expireTime = isNaN(Number(process.env.EXPIRE_TIME))
-    ? 60 * 60 * 24
-    : Number(process.env.EXPIRE_TIME);
-
-const fetchNew = async (
-    req: Request,
-    key: string,
-    statusKey: string,
-    headerKey: string
-) => {
-    const { query, method } = req;
-    const { host, ...headers } = req.headers;
-
-    try {
-        const result = await $ax(req.path, {
-            headers: headers as {},
-            params: query,
-            method,
-        });
-        await redis.setex(key, expireTime, JSON.stringify(result.data));
-        await redis.setex(statusKey, expireTime, result.status);
-        await redis.setex(
-            headerKey,
-            expireTime,
-            JSON.stringify(result.headers)
-        );
-        return {
-            headers: JSON.stringify(result.headers),
-            status: result.status,
-            data: result.data,
-        };
-    } catch (err) {
-        if ('response' in (err as {})) {
-            const { response } = err as any;
-            console.log(response);
-            return {
-                headers: JSON.stringify(response.headers),
-                status: response.status,
-                data: response.data,
-            };
-        } else {
-            return {
-                headers: '{}',
-                status: 404,
-                data: {},
-            };
-        }
-    }
-};
 
 const getData = async (req: Request) => {
     const { query } = req;
@@ -75,17 +32,62 @@ const getData = async (req: Request) => {
         };
     }
 
-    return token
-        ? await fetchNew(req, key, statusKey, headerKey)
-        : {
-              headers: '{}',
-              status: 403,
-              data: {
-                  message: 'Has no token and no cache.',
-              },
-          };
+    if (!token)
+        return {
+            headers: '{}',
+            status: 403,
+            data: {
+                message: 'Has no token and no cache.',
+            },
+        };
+
+    const customReq: CustomReq = {
+        query: req.query,
+        method: req.method,
+        path: req.path,
+        ...headers,
+    };
+    const result = await fetchNew(customReq);
+    await cacheNew(
+        key,
+        statusKey,
+        headerKey,
+        JSON.stringify(result.data),
+        result.status,
+        result.headers
+    );
+    await saveRequest(customReq);
+    return result;
 };
 
+router.post('/update', async (req, res) => {
+    const reqs: CustomReq[] = JSON.parse((await redis.get(requestKey)) ?? '[]');
+    const callback = async (req: CustomReq) => {
+        const { query } = req;
+
+        const key = `${req.path}${JSON.stringify(query)}`;
+        const headerKey = `${key}-headers`;
+        const statusKey = `${key}-status`;
+
+        const result = await fetchNew(req);
+        await cacheNew(
+            key,
+            statusKey,
+            headerKey,
+            JSON.stringify(result.data),
+            result.status,
+            result.headers
+        );
+        await sleep(10);
+    };
+
+    try {
+        await Promise.all(reqs.map(callback));
+        res.send('OK');
+    } catch (err) {
+        res.status(500).send('Not ok');
+    }
+});
 router.post('/clean', async (req, res) => {
     const result = await redis.flushall();
     res.send(result);
