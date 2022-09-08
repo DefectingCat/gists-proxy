@@ -88,6 +88,7 @@ router.post('/update', async (req, res) => {
         res.status(500).send('Not ok');
     }
 });
+
 router.post('/clean', async (req, res) => {
     const result = await redis.flushall();
     res.send(result);
