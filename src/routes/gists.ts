@@ -32,7 +32,7 @@ const getData = async (req: Request) => {
         };
     }
 
-    if (!token)
+    if (!token) {
         return {
             headers: '{}',
             status: 403,
@@ -40,6 +40,7 @@ const getData = async (req: Request) => {
                 message: 'Has no token and no cache.',
             },
         };
+    }
 
     const customReq: CustomReq = {
         query: req.query,
@@ -98,11 +99,12 @@ router.all('/*', async (req, res) => {
     const result = await getData(req);
     res.header(JSON.parse(result.headers));
     res.status(result.status);
-    res.setHeader(
-        'content-length',
-        result.data.length ?? result.data.toString().length
-    );
-    res.setHeader('transfer-encoding', '');
+    // res.setHeader(
+    //     'Content-Length',
+    //     result.data.length ?? result.data.toString().length
+    // );
+    // res.setHeader('Transfer-encoding', 'chunked');
+    res.removeHeader('Transfer-encoding');
     res.send(result.data);
 });
 
