@@ -31,8 +31,5 @@ const job = async () => {
 };
 
 export const updateCache = async () => {
-    const rule = new schedule.RecurrenceRule();
-    rule.minute = 30;
-
-    schedule.scheduleJob(rule, job);
+    schedule.scheduleJob('*/30 * * * *', job);
 };
