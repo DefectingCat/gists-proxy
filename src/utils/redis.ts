@@ -3,7 +3,9 @@ import { config } from 'dotenv';
 
 config();
 
-const host = process.env.REDIS_HOST ?? '127.0.0.1';
+const isDev = process.env.NODE_ENV === 'development';
+
+const host = isDev ? 'localhost' : process.env.REDIS_HOST ?? '127.0.0.1';
 const port = Number(process.env.REDIS_PORT);
 const db = Number(process.env.REDIS_DB);
 
